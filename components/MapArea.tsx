@@ -192,7 +192,7 @@ export const MapArea = () => {
   useEffect(() => {
     const velocityPerMS = {
       walker: 4000 / 3600 / 1000,
-      car: 60000 / 3600 / 1000,
+      car: 30000 / 3600 / 1000,
     }
     let cancelId = 0
     const fn = () => {
@@ -226,7 +226,7 @@ export const MapArea = () => {
                 (step * n - remain + velocityPerMS.walker * now) % road.properties.distance,
                 road.properties.bearing
               ),
-              Math.sin(n) / 1.25 + 2.75,
+              Math.sin(n) + 3.25,
               road.properties.bearing + 90 * (n % 2 ? 1 : -1)
             )
 
@@ -237,18 +237,29 @@ export const MapArea = () => {
                   road.properties.distance,
                 road.properties.bearing
               ),
-              Math.sin(n) / 1.75 + 2.5,
+              Math.sin(n) + 3,
               road.properties.bearing - 90 * (n % 2 ? 1 : -1)
             )
 
             list.push(
-              ...[point1, point2].map((p) =>
+              ...[point1, point2].map((p, i) =>
                 zoom >= 17
-                  ? polygon([
-                      [...Array(20 + 1)]
-                        .map((_, i) => computeDestinationPoint(p, 0.2, (360 / 20) * (i % 20)))
-                        .map(({ longitude, latitude }) => [longitude, latitude]),
-                    ])
+                  ? transformRotate(
+                      polygon([
+                        [
+                          [0.25, 0],
+                          [0.25, 90],
+                          [Math.sqrt(2) * 0.25, 135],
+                          [0, 0],
+                          [Math.sqrt(2) * 0.25, 225],
+                          [0.25, 270],
+                          [0.25, 0],
+                        ]
+                          .map(([d, r]) => computeDestinationPoint(p, d, r))
+                          .map(({ longitude, latitude }) => [longitude, latitude]),
+                      ]),
+                      road.properties.bearing + (i % 2 ? 180 : 0)
+                    )
                   : {
                       type: 'Feature' as const,
                       properties: {},
@@ -300,15 +311,23 @@ export const MapArea = () => {
             )
 
             list.push(
-              ...[point1, point2].map((p) =>
+              ...[point1, point2].map((p, i) =>
                 zoom >= 17
                   ? transformRotate(
                       polygon([
-                        [30, 150, 210, 330, 30]
-                          .map((r) => computeDestinationPoint(p, 1, r))
+                        [
+                          [0.5, 0],
+                          [0.5, 90],
+                          [1, 150],
+                          [0.5, 180],
+                          [1, 210],
+                          [0.5, 270],
+                          [0.5, 0],
+                        ]
+                          .map(([d, r]) => computeDestinationPoint(p, d, r))
                           .map(({ longitude, latitude }) => [longitude, latitude]),
                       ]),
-                      road.properties.bearing
+                      road.properties.bearing + (i % 2 ? 180 : 0)
                     )
                   : {
                       type: 'Feature' as const,
