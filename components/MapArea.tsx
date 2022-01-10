@@ -21,9 +21,10 @@ export const MapArea = () => {
     features: [],
   })
   const [viewport, setViewport] = useState<ViewportProps>({
-    latitude: 35.690921,
-    longitude: 139.70025799999996,
-    zoom: 10,
+    latitude: 35.610493335927146,
+    longitude: 139.70963079522326,
+    zoom: 11.548058916916952,
+    pitch: 56.12617658004021,
     maxPitch: 80,
   })
   const mapGlLayers = useMemo<LayerProps[]>(
@@ -76,42 +77,6 @@ export const MapArea = () => {
     () => [
       {
         source: {
-          id: 'people-data',
-          type: 'geojson',
-          data: peopleJson,
-        },
-        layer: {
-          id: 'people',
-          type: 'fill-extrusion',
-          minzoom: 17,
-          paint: {
-            'fill-extrusion-color': '#0084ff',
-            'fill-extrusion-height': 0.5,
-            'fill-extrusion-base': 0,
-            'fill-extrusion-opacity': 0.6,
-          },
-        },
-      },
-      {
-        source: {
-          id: 'people-point-data',
-          type: 'geojson',
-          data: peopleJson,
-        },
-        layer: {
-          id: 'people-point',
-          type: 'circle',
-          maxzoom: 17,
-          paint: {
-            'circle-radius': 2,
-            'circle-stroke-color': '#0084ff',
-            'circle-color': 'white',
-            'circle-stroke-width': 1,
-          },
-        },
-      },
-      {
-        source: {
           id: 'cars-data',
           type: 'geojson',
           data: carsJson,
@@ -141,6 +106,42 @@ export const MapArea = () => {
           paint: {
             'circle-radius': 2,
             'circle-stroke-color': 'red',
+            'circle-color': 'white',
+            'circle-stroke-width': 1,
+          },
+        },
+      },
+      {
+        source: {
+          id: 'people-data',
+          type: 'geojson',
+          data: peopleJson,
+        },
+        layer: {
+          id: 'people',
+          type: 'fill-extrusion',
+          minzoom: 17,
+          paint: {
+            'fill-extrusion-color': '#0084ff',
+            'fill-extrusion-height': 0.5,
+            'fill-extrusion-base': 0,
+            'fill-extrusion-opacity': 0.6,
+          },
+        },
+      },
+      {
+        source: {
+          id: 'people-point-data',
+          type: 'geojson',
+          data: peopleJson,
+        },
+        layer: {
+          id: 'people-point',
+          type: 'circle',
+          maxzoom: 17,
+          paint: {
+            'circle-radius': 2,
+            'circle-stroke-color': '#0084ff',
             'circle-color': 'white',
             'circle-stroke-width': 1,
           },
@@ -192,7 +193,7 @@ export const MapArea = () => {
   useEffect(() => {
     const velocityPerMS = {
       walker: 4000 / 3600 / 1000,
-      car: 30000 / 3600 / 1000,
+      car: 40000 / 3600 / 1000,
     }
     let cancelId = 0
     const fn = () => {
