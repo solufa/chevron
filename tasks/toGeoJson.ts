@@ -181,6 +181,8 @@ const { lines } = tmpLines
             ...line.properties,
             distanceFrom,
             distanceTo: distanceFrom + line.properties.distance,
+            lonStart: line.geometry.coordinates[0][0],
+            latStart: line.geometry.coordinates[0][1],
           },
         },
       ],

@@ -7,6 +7,8 @@ export type RoadFeature = {
     distanceFrom: number
     distanceTo: number
     bearing: number
+    lonStart: number
+    latStart: number
   }
   geometry: {
     type: 'LineString'

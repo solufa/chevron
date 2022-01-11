@@ -3,12 +3,14 @@ import { Feature, polygon, Properties, transformRotate } from '@turf/turf'
 import { FeatureCollection, Geometry } from 'geojson'
 import { computeDestinationPoint } from 'geolib'
 import { Map } from 'mapbox-gl'
+import 'mapbox-gl/dist/mapbox-gl.css'
 import { useEffect, useMemo, useState } from 'react'
 import ReactMapGL, { Layer, LayerProps, Source, SourceProps, ViewportProps } from 'react-map-gl'
 import { RoadFeature } from '../types/json'
 
 // eslint-disable-next-line
 const roadFeatures: RoadFeature[] = require('../tasks/road.json')
+const minzoom = 17
 
 export const MapArea = () => {
   const [mapObj, setMapObj] = useState<Map>()
@@ -16,7 +18,15 @@ export const MapArea = () => {
     type: 'FeatureCollection',
     features: [],
   })
+  const [peopleShadowJson, setPeopleShadowJson] = useState<FeatureCollection<Geometry>>({
+    type: 'FeatureCollection',
+    features: [],
+  })
   const [carsJson, setCarsJson] = useState<FeatureCollection<Geometry>>({
+    type: 'FeatureCollection',
+    features: [],
+  })
+  const [carsShadowJson, setCarsShadowJson] = useState<FeatureCollection<Geometry>>({
     type: 'FeatureCollection',
     features: [],
   })
@@ -25,7 +35,7 @@ export const MapArea = () => {
     longitude: 139.70963079522326,
     zoom: 11.548058916916952,
     pitch: 56.12617658004021,
-    maxPitch: 80,
+    maxPitch: 70,
   })
   const mapGlLayers = useMemo<LayerProps[]>(
     () => [
@@ -77,6 +87,22 @@ export const MapArea = () => {
     () => [
       {
         source: {
+          id: 'cars-shadow-data',
+          type: 'geojson',
+          data: carsShadowJson,
+        },
+        layer: {
+          id: 'cars-shadow',
+          type: 'fill-extrusion',
+          minzoom,
+          paint: {
+            'fill-extrusion-color': '#888',
+            'fill-extrusion-height': 0,
+          },
+        },
+      },
+      {
+        source: {
           id: 'cars-data',
           type: 'geojson',
           data: carsJson,
@@ -84,12 +110,10 @@ export const MapArea = () => {
         layer: {
           id: 'cars',
           type: 'fill-extrusion',
-          minzoom: 17,
+          minzoom,
           paint: {
             'fill-extrusion-color': 'red',
-            'fill-extrusion-height': 0.75,
-            'fill-extrusion-base': 0,
-            'fill-extrusion-opacity': 0.6,
+            'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], minzoom, 3, 20, 0.75],
           },
         },
       },
@@ -102,12 +126,28 @@ export const MapArea = () => {
         layer: {
           id: 'cars-point',
           type: 'circle',
-          maxzoom: 17,
+          maxzoom: minzoom,
           paint: {
             'circle-radius': 2,
             'circle-stroke-color': 'red',
             'circle-color': 'white',
             'circle-stroke-width': 1,
+          },
+        },
+      },
+      {
+        source: {
+          id: 'people-shadow-data',
+          type: 'geojson',
+          data: peopleShadowJson,
+        },
+        layer: {
+          id: 'people-shadow',
+          type: 'fill-extrusion',
+          minzoom: minzoom,
+          paint: {
+            'fill-extrusion-color': '#888',
+            'fill-extrusion-height': 0,
           },
         },
       },
@@ -120,12 +160,10 @@ export const MapArea = () => {
         layer: {
           id: 'people',
           type: 'fill-extrusion',
-          minzoom: 17,
+          minzoom,
           paint: {
             'fill-extrusion-color': '#0084ff',
-            'fill-extrusion-height': 0.5,
-            'fill-extrusion-base': 0,
-            'fill-extrusion-opacity': 0.6,
+            'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], minzoom, 3, 20, 0.75],
           },
         },
       },
@@ -138,7 +176,7 @@ export const MapArea = () => {
         layer: {
           id: 'people-point',
           type: 'circle',
-          maxzoom: 17,
+          maxzoom: minzoom,
           paint: {
             'circle-radius': 2,
             'circle-stroke-color': '#0084ff',
@@ -204,144 +242,179 @@ export const MapArea = () => {
         layers: [linesLayerId],
       }) as unknown as RoadFeature[]
       const totalDistance = features.reduce((dis, f) => dis + f.properties.distance, 0)
-      const step = [...Array(6)].reduce<number>(
-        (result, _, n) => (result > 0 ? result : totalDistance / 10 ** n < 2000 ? 10 ** n : 0),
-        0
-      )
+      const step = Math.max(1, Math.floor(totalDistance / 2000))
       const zoom = mapObj.getZoom()
+      // const scale = zoom >= minzoom ? (1 / 2) ** mapObj.getZoom() * 2 ** 20 : 5
+      const scale = zoom >= minzoom ? 2 : 4
+      const list1 = features.map((road) => {
+        const remain = road.properties.distanceFrom % step
+        const peopleList: Feature<Geometry, Properties>[] = []
+        const shadowList: Feature<Geometry, Properties>[] = []
+        const posList = [
+          [0.25, 0],
+          [0.25, 90],
+          [Math.sqrt(2) * 0.25, 135],
+          [0, 0],
+          [Math.sqrt(2) * 0.25, 225],
+          [0.25, 270],
+          [0.25, 0],
+        ]
+        let n = 0
+        while (road.properties.distanceFrom + step * n - remain < road.properties.distanceTo) {
+          const point1 = computeDestinationPoint(
+            computeDestinationPoint(
+              [road.properties.lonStart, road.properties.latStart], // road.geometry.coordinates[0] を使うとずれる
+              (step * n - remain + velocityPerMS.walker * now) % road.properties.distance,
+              road.properties.bearing
+            ),
+            (Math.sin(n + 1) + 3.2) * scale,
+            road.properties.bearing + 90 * (n % 2 ? 1 : -1)
+          )
+          const point2 = computeDestinationPoint(
+            computeDestinationPoint(
+              [road.properties.lonStart, road.properties.latStart],
+              (step * n - remain + velocityPerMS.walker * (10000000000000 - now)) %
+                road.properties.distance,
+              road.properties.bearing
+            ),
+            (Math.sin(n) + 3.3) * scale,
+            road.properties.bearing - 90 * (n % 2 ? 1 : -1)
+          )
+
+          peopleList.push(
+            ...[point1, point2].map((p, i) =>
+              zoom >= minzoom
+                ? transformRotate(
+                    polygon([
+                      posList
+                        .map(([d, r]) => computeDestinationPoint(p, d * scale, r))
+                        .map(({ longitude, latitude }) => [longitude, latitude]),
+                    ]),
+                    road.properties.bearing + (i % 2 ? 180 : 0)
+                  )
+                : {
+                    type: 'Feature' as const,
+                    properties: {},
+                    geometry: { type: 'Point' as const, coordinates: [p.longitude, p.latitude] },
+                  }
+            )
+          )
+
+          if (zoom >= minzoom) {
+            shadowList.push(
+              ...[point1, point2].map((p, i) =>
+                transformRotate(
+                  polygon([
+                    posList
+                      .map(([d, r]) => computeDestinationPoint(p, d * scale * 1.5, r))
+                      .map(({ longitude, latitude }) => [longitude, latitude]),
+                  ]),
+                  road.properties.bearing + (i % 2 ? 180 : 0)
+                )
+              )
+            )
+          }
+          n += 1
+        }
+
+        return { peopleList, shadowList }
+      })
 
       setPeopleJson({
         type: 'FeatureCollection',
-        features: features.flatMap((road) => {
-          const remain = road.properties.distanceFrom % step
-          const list: Feature<Geometry, Properties>[] = []
-          let n = 0
-          while (road.properties.distanceFrom + step * n - remain < road.properties.distanceTo) {
-            const startPoint = {
-              lon: road.geometry.coordinates[0][0],
-              lat: road.geometry.coordinates[0][1],
-            }
-            const point1 = computeDestinationPoint(
-              computeDestinationPoint(
-                startPoint,
-                (step * n - remain + velocityPerMS.walker * now) % road.properties.distance,
-                road.properties.bearing
-              ),
-              Math.sin(n) + 3.25,
-              road.properties.bearing + 90 * (n % 2 ? 1 : -1)
-            )
+        features: list1.flatMap(({ peopleList }) => peopleList),
+      })
 
-            const point2 = computeDestinationPoint(
-              computeDestinationPoint(
-                startPoint,
-                (step * n - remain + velocityPerMS.walker * (10000000000000 - now)) %
-                  road.properties.distance,
-                road.properties.bearing
-              ),
-              Math.sin(n) + 3,
-              road.properties.bearing - 90 * (n % 2 ? 1 : -1)
-            )
-
-            list.push(
-              ...[point1, point2].map((p, i) =>
-                zoom >= 17
-                  ? transformRotate(
-                      polygon([
-                        [
-                          [0.25, 0],
-                          [0.25, 90],
-                          [Math.sqrt(2) * 0.25, 135],
-                          [0, 0],
-                          [Math.sqrt(2) * 0.25, 225],
-                          [0.25, 270],
-                          [0.25, 0],
-                        ]
-                          .map(([d, r]) => computeDestinationPoint(p, d, r))
-                          .map(({ longitude, latitude }) => [longitude, latitude]),
-                      ]),
-                      road.properties.bearing + (i % 2 ? 180 : 0)
-                    )
-                  : {
-                      type: 'Feature' as const,
-                      properties: {},
-                      geometry: { type: 'Point' as const, coordinates: [p.longitude, p.latitude] },
-                    }
-              )
-            )
-            n += 1
-          }
-
-          return list
-        }),
+      setPeopleShadowJson({
+        type: 'FeatureCollection',
+        features: list1.flatMap(({ shadowList }) => shadowList),
       })
 
       const carsStep = step * 20
-      setCarsJson({
-        type: 'FeatureCollection',
-        features: features.flatMap((road) => {
-          const remain = road.properties.distanceFrom % carsStep
-          const list: Feature<Geometry, Properties>[] = []
-          let n = 0
-          while (
-            road.properties.distanceFrom + carsStep * n - remain <
-            road.properties.distanceTo
-          ) {
-            const startPoint = {
-              lon: road.geometry.coordinates[0][0],
-              lat: road.geometry.coordinates[0][1],
-            }
-            const point1 = computeDestinationPoint(
-              computeDestinationPoint(
-                startPoint,
-                (carsStep * n - remain + velocityPerMS.car * now) % road.properties.distance,
-                road.properties.bearing
-              ),
-              0.75,
-              road.properties.bearing - 90
-            )
+      const list2 = features.map((road) => {
+        const remain = road.properties.distanceFrom % carsStep
+        const carsList: Feature<Geometry, Properties>[] = []
+        const shadowList: Feature<Geometry, Properties>[] = []
+        const posList = [
+          [0.5, 0],
+          [0.5, 90],
+          [1, 150],
+          [0.5, 180],
+          [1, 210],
+          [0.5, 270],
+          [0.5, 0],
+        ]
+        let n = 0
+        while (road.properties.distanceFrom + carsStep * n - remain < road.properties.distanceTo) {
+          const point1 = computeDestinationPoint(
+            computeDestinationPoint(
+              [road.properties.lonStart, road.properties.latStart],
+              (carsStep * n - remain + velocityPerMS.car * now) % road.properties.distance,
+              road.properties.bearing
+            ),
+            0.75 * scale,
+            road.properties.bearing - 90
+          )
 
-            const point2 = computeDestinationPoint(
-              computeDestinationPoint(
-                startPoint,
-                (carsStep * n - remain + velocityPerMS.car * (10000000000000 - now)) %
-                  road.properties.distance,
-                road.properties.bearing
-              ),
-              0.75,
-              road.properties.bearing + 90
-            )
+          const point2 = computeDestinationPoint(
+            computeDestinationPoint(
+              [road.properties.lonStart, road.properties.latStart],
+              (carsStep * n - remain + velocityPerMS.car * (10000000000000 - now)) %
+                road.properties.distance,
+              road.properties.bearing
+            ),
+            0.75 * scale,
+            road.properties.bearing + 90
+          )
 
-            list.push(
+          carsList.push(
+            ...[point1, point2].map((p, i) =>
+              zoom >= minzoom
+                ? transformRotate(
+                    polygon([
+                      posList
+                        .map(([d, r]) => computeDestinationPoint(p, d * scale, r))
+                        .map(({ longitude, latitude }) => [longitude, latitude]),
+                    ]),
+                    road.properties.bearing + (i % 2 ? 180 : 0)
+                  )
+                : {
+                    type: 'Feature' as const,
+                    properties: {},
+                    geometry: { type: 'Point' as const, coordinates: [p.longitude, p.latitude] },
+                  }
+            )
+          )
+
+          if (zoom >= minzoom) {
+            shadowList.push(
               ...[point1, point2].map((p, i) =>
-                zoom >= 17
-                  ? transformRotate(
-                      polygon([
-                        [
-                          [0.5, 0],
-                          [0.5, 90],
-                          [1, 150],
-                          [0.5, 180],
-                          [1, 210],
-                          [0.5, 270],
-                          [0.5, 0],
-                        ]
-                          .map(([d, r]) => computeDestinationPoint(p, d, r))
-                          .map(({ longitude, latitude }) => [longitude, latitude]),
-                      ]),
-                      road.properties.bearing + (i % 2 ? 180 : 0)
-                    )
-                  : {
-                      type: 'Feature' as const,
-                      properties: {},
-                      geometry: { type: 'Point' as const, coordinates: [p.longitude, p.latitude] },
-                    }
+                transformRotate(
+                  polygon([
+                    posList
+                      .map(([d, r]) => computeDestinationPoint(p, d * scale * 1.25, r))
+                      .map(({ longitude, latitude }) => [longitude, latitude]),
+                  ]),
+                  road.properties.bearing + (i % 2 ? 180 : 0)
+                )
               )
             )
-            n += 1
           }
 
-          return list
-        }),
+          n += 1
+        }
+
+        return { carsList, shadowList }
+      })
+
+      setCarsJson({
+        type: 'FeatureCollection',
+        features: list2.flatMap(({ carsList }) => carsList),
+      })
+
+      setCarsShadowJson({
+        type: 'FeatureCollection',
+        features: list2.flatMap(({ shadowList }) => shadowList),
       })
       cancelId = requestAnimationFrame(fn)
     }
