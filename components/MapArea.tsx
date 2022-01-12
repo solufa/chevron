@@ -1,15 +1,13 @@
 import DeckGL from '@deck.gl/react'
 import { Feature, polygon, Properties, transformRotate } from '@turf/turf'
 import { FeatureCollection, Geometry } from 'geojson'
-import { computeDestinationPoint } from 'geolib'
+import { computeDestinationPoint, getDistance, getRhumbLineBearing } from 'geolib'
 import { Map } from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import { useEffect, useMemo, useState } from 'react'
 import ReactMapGL, { Layer, LayerProps, Source, SourceProps, ViewportProps } from 'react-map-gl'
 import { RoadFeature } from '../types/json'
 
-// eslint-disable-next-line
-const roadFeatures: RoadFeature[] = require('../tasks/road.json')
 const minzoom = 17
 
 export const MapArea = () => {
@@ -82,17 +80,33 @@ export const MapArea = () => {
     []
   )
 
-  const linesLayerId = 'lines-data'
-  const sourceLayers = useMemo<{ source: SourceProps; layer: LayerProps }[]>(
+  const vectorRoadId = 'vector-road'
+  const sourceLayers = useMemo<{ id: string; source: SourceProps; layer: LayerProps }[]>(
     () => [
       {
+        id: vectorRoadId,
         source: {
-          id: 'cars-shadow-data',
+          type: 'vector',
+          url: 'mapbox://mapbox.mapbox-streets-v8',
+        },
+        layer: {
+          'source-layer': 'road',
+          type: 'line',
+          filter: ['in', 'class', 'trunk', 'primary', 'secondary'],
+          paint: {
+            'line-opacity': 0.6,
+            'line-color': 'rgb(53, 175, 109)',
+            'line-width': 0,
+          },
+        },
+      },
+      {
+        id: 'cars-shadow',
+        source: {
           type: 'geojson',
           data: carsShadowJson,
         },
         layer: {
-          id: 'cars-shadow',
           type: 'fill-extrusion',
           minzoom,
           paint: {
@@ -102,13 +116,12 @@ export const MapArea = () => {
         },
       },
       {
+        id: 'cars',
         source: {
-          id: 'cars-data',
           type: 'geojson',
           data: carsJson,
         },
         layer: {
-          id: 'cars',
           type: 'fill-extrusion',
           minzoom,
           paint: {
@@ -118,13 +131,12 @@ export const MapArea = () => {
         },
       },
       {
+        id: 'cars-point',
         source: {
-          id: 'cars-point-data',
           type: 'geojson',
           data: carsJson,
         },
         layer: {
-          id: 'cars-point',
           type: 'circle',
           maxzoom: minzoom,
           paint: {
@@ -136,13 +148,12 @@ export const MapArea = () => {
         },
       },
       {
+        id: 'people-shadow',
         source: {
-          id: 'people-shadow-data',
           type: 'geojson',
           data: peopleShadowJson,
         },
         layer: {
-          id: 'people-shadow',
           type: 'fill-extrusion',
           minzoom: minzoom,
           paint: {
@@ -152,13 +163,12 @@ export const MapArea = () => {
         },
       },
       {
+        id: 'people',
         source: {
-          id: 'people-data',
           type: 'geojson',
           data: peopleJson,
         },
         layer: {
-          id: 'people',
           type: 'fill-extrusion',
           minzoom,
           paint: {
@@ -168,13 +178,12 @@ export const MapArea = () => {
         },
       },
       {
+        id: 'people-point',
         source: {
-          id: 'people-point-data',
           type: 'geojson',
           data: peopleJson,
         },
         layer: {
-          id: 'people-point',
           type: 'circle',
           maxzoom: minzoom,
           paint: {
@@ -185,45 +194,6 @@ export const MapArea = () => {
           },
         },
       },
-      {
-        source: {
-          id: 'lines-data',
-          type: 'geojson',
-          data: {
-            type: 'FeatureCollection',
-            features: roadFeatures,
-          },
-        },
-        layer: {
-          id: linesLayerId,
-          type: 'line',
-          // layout: {
-          //   'line-join': 'round',
-          //   'line-cap': 'round',
-          // },
-          paint: {
-            // 'line-color': ['get', 'color'],
-            'line-width': 0,
-          },
-        },
-      },
-      // {
-      //   source: {
-      //     id: 'road-vector-data',
-      //     type: 'vector',
-      //     tiles: ['https://cyberjapandata.gsi.go.jp/xyz/experimental_bvmap/{z}/{x}/{y}.pbf'],
-      //   },
-      //   layer: {
-      //     id: 'road-vector',
-      //     type: 'line',
-      //     source: 'gsi-bvmap',
-      //     'source-layer': 'road',
-      //     paint: {
-      //       'line-color': '#900',
-      //       'line-width': 3,
-      //     },
-      //   },
-      // },
     ],
     [peopleJson]
   )
@@ -239,15 +209,65 @@ export const MapArea = () => {
 
       const now = Date.now()
       const features = mapObj.queryRenderedFeatures(undefined, {
-        layers: [linesLayerId],
+        layers: [vectorRoadId],
       }) as unknown as RoadFeature[]
-      const totalDistance = features.reduce((dis, f) => dis + f.properties.distance, 0)
-      const step = Math.max(1, Math.floor(totalDistance / 2000))
+      const roadList = features
+        .map((f) =>
+          f.geometry.type === 'MultiLineString'
+            ? f.geometry.coordinates.map((c) =>
+                c.slice(1).map((pos, i) => ({
+                  startPos: c[i],
+                  distance: getDistance(c[i], pos),
+                  bearing: getRhumbLineBearing(
+                    { lon: c[i][0], lat: c[i][1] },
+                    { lon: pos[0], lat: pos[1] }
+                  ),
+                }))
+              )
+            : f.geometry.coordinates.slice(1).map((pos, i) => {
+                if (f.geometry.type !== 'LineString') throw new Error('')
+
+                return {
+                  startPos: f.geometry.coordinates[i],
+                  distance: getDistance(f.geometry.coordinates[i], pos),
+                  bearing: getRhumbLineBearing(
+                    { lon: f.geometry.coordinates[i][0], lat: f.geometry.coordinates[i][1] },
+                    { lon: pos[0], lat: pos[1] }
+                  ),
+                }
+              })
+        )
+        .flat(2)
+        .reduce(
+          ({ distanceFrom, lines }, line) => ({
+            distanceFrom: distanceFrom + line.distance,
+            lines: [
+              ...lines,
+              {
+                ...line,
+                distanceFrom,
+                distanceTo: distanceFrom + line.distance,
+              },
+            ],
+          }),
+          {
+            distanceFrom: 0,
+            lines: [] as {
+              startPos: [number, number]
+              distance: number
+              bearing: number
+              distanceFrom: number
+              distanceTo: number
+            }[],
+          }
+        ).lines
+      const totalDistance = roadList.reduce((dis, d) => dis + d.distance, 0)
+      const step = Math.max(1, Math.floor(totalDistance / 250))
       const zoom = mapObj.getZoom()
       // const scale = zoom >= minzoom ? (1 / 2) ** mapObj.getZoom() * 2 ** 20 : 5
       const scale = zoom >= minzoom ? 2 : 4
-      const list1 = features.map((road) => {
-        const remain = road.properties.distanceFrom % step
+      const list1 = roadList.map((road) => {
+        const remain = road.distanceFrom % step
         const peopleList: Feature<Geometry, Properties>[] = []
         const shadowList: Feature<Geometry, Properties>[] = []
         const posList = [
@@ -257,61 +277,59 @@ export const MapArea = () => {
           [0, 0],
           [Math.sqrt(2) * 0.25, 225],
           [0.25, 270],
-          [0.25, 0],
         ]
         let n = 0
-        while (road.properties.distanceFrom + step * n - remain < road.properties.distanceTo) {
+        while (road.distanceFrom + step * n - remain < road.distanceTo) {
           const point1 = computeDestinationPoint(
             computeDestinationPoint(
-              [road.properties.lonStart, road.properties.latStart], // road.geometry.coordinates[0] を使うとずれる
-              (step * n - remain + velocityPerMS.walker * now) % road.properties.distance,
-              road.properties.bearing
+              road.startPos, // road.geometry.coordinates[0] を使うとずれる
+              (step * n - remain + velocityPerMS.walker * now) % road.distance,
+              road.bearing
             ),
             (Math.sin(n + 1) + 3.2) * scale,
-            road.properties.bearing + 90 * (n % 2 ? 1 : -1)
+            road.bearing + 90 * (n % 2 ? 1 : -1)
           )
           const point2 = computeDestinationPoint(
             computeDestinationPoint(
-              [road.properties.lonStart, road.properties.latStart],
-              (step * n - remain + velocityPerMS.walker * (10000000000000 - now)) %
-                road.properties.distance,
-              road.properties.bearing
+              road.startPos,
+              (step * n - remain + velocityPerMS.walker * (10000000000000 - now)) % road.distance,
+              road.bearing
             ),
             (Math.sin(n) + 3.3) * scale,
-            road.properties.bearing - 90 * (n % 2 ? 1 : -1)
+            road.bearing - 90 * (n % 2 ? 1 : -1)
           )
 
           peopleList.push(
-            ...[point1, point2].map((p, i) =>
-              zoom >= minzoom
-                ? transformRotate(
-                    polygon([
-                      posList
-                        .map(([d, r]) => computeDestinationPoint(p, d * scale, r))
-                        .map(({ longitude, latitude }) => [longitude, latitude]),
-                    ]),
-                    road.properties.bearing + (i % 2 ? 180 : 0)
-                  )
-                : {
-                    type: 'Feature' as const,
-                    properties: {},
-                    geometry: { type: 'Point' as const, coordinates: [p.longitude, p.latitude] },
-                  }
-            )
+            ...[point1, point2].map((p, i) => {
+              if (zoom < minzoom)
+                return {
+                  type: 'Feature' as const,
+                  properties: {},
+                  geometry: { type: 'Point' as const, coordinates: [p.longitude, p.latitude] },
+                }
+
+              const poly = posList
+                .map(([d, r]) => computeDestinationPoint(p, d * scale, r))
+                .map(({ longitude, latitude }) => [longitude, latitude] as [number, number])
+              return transformRotate(
+                polygon([[...poly, poly[0]]]),
+                road.bearing + (i % 2 ? 180 : 0)
+              )
+            })
           )
 
           if (zoom >= minzoom) {
             shadowList.push(
-              ...[point1, point2].map((p, i) =>
-                transformRotate(
-                  polygon([
-                    posList
-                      .map(([d, r]) => computeDestinationPoint(p, d * scale * 1.5, r))
-                      .map(({ longitude, latitude }) => [longitude, latitude]),
-                  ]),
-                  road.properties.bearing + (i % 2 ? 180 : 0)
+              ...[point1, point2].map((p, i) => {
+                const poly = posList
+                  .map(([d, r]) => computeDestinationPoint(p, d * scale * 1.5, r))
+                  .map(({ longitude, latitude }) => [longitude, latitude])
+
+                return transformRotate(
+                  polygon([[...poly, poly[0]]]),
+                  road.bearing + (i % 2 ? 180 : 0)
                 )
-              )
+              })
             )
           }
           n += 1
@@ -331,8 +349,8 @@ export const MapArea = () => {
       })
 
       const carsStep = step * 20
-      const list2 = features.map((road) => {
-        const remain = road.properties.distanceFrom % carsStep
+      const list2 = roadList.map((road) => {
+        const remain = road.distanceFrom % carsStep
         const carsList: Feature<Geometry, Properties>[] = []
         const shadowList: Feature<Geometry, Properties>[] = []
         const posList = [
@@ -342,62 +360,59 @@ export const MapArea = () => {
           [0.5, 180],
           [1, 210],
           [0.5, 270],
-          [0.5, 0],
         ]
         let n = 0
-        while (road.properties.distanceFrom + carsStep * n - remain < road.properties.distanceTo) {
+        while (road.distanceFrom + carsStep * n - remain < road.distanceTo) {
           const point1 = computeDestinationPoint(
             computeDestinationPoint(
-              [road.properties.lonStart, road.properties.latStart],
-              (carsStep * n - remain + velocityPerMS.car * now) % road.properties.distance,
-              road.properties.bearing
+              road.startPos,
+              (carsStep * n - remain + velocityPerMS.car * now) % road.distance,
+              road.bearing
             ),
             0.75 * scale,
-            road.properties.bearing - 90
+            road.bearing - 90
           )
 
           const point2 = computeDestinationPoint(
             computeDestinationPoint(
-              [road.properties.lonStart, road.properties.latStart],
-              (carsStep * n - remain + velocityPerMS.car * (10000000000000 - now)) %
-                road.properties.distance,
-              road.properties.bearing
+              road.startPos,
+              (carsStep * n - remain + velocityPerMS.car * (10000000000000 - now)) % road.distance,
+              road.bearing
             ),
             0.75 * scale,
-            road.properties.bearing + 90
+            road.bearing + 90
           )
 
           carsList.push(
-            ...[point1, point2].map((p, i) =>
-              zoom >= minzoom
-                ? transformRotate(
-                    polygon([
-                      posList
-                        .map(([d, r]) => computeDestinationPoint(p, d * scale, r))
-                        .map(({ longitude, latitude }) => [longitude, latitude]),
-                    ]),
-                    road.properties.bearing + (i % 2 ? 180 : 0)
-                  )
-                : {
-                    type: 'Feature' as const,
-                    properties: {},
-                    geometry: { type: 'Point' as const, coordinates: [p.longitude, p.latitude] },
-                  }
-            )
+            ...[point1, point2].map((p, i) => {
+              if (zoom < minzoom)
+                return {
+                  type: 'Feature' as const,
+                  properties: {},
+                  geometry: { type: 'Point' as const, coordinates: [p.longitude, p.latitude] },
+                }
+
+              const poly = posList
+                .map(([d, r]) => computeDestinationPoint(p, d * scale, r))
+                .map(({ longitude, latitude }) => [longitude, latitude])
+              return transformRotate(
+                polygon([[...poly, poly[0]]]),
+                road.bearing + (i % 2 ? 180 : 0)
+              )
+            })
           )
 
           if (zoom >= minzoom) {
             shadowList.push(
-              ...[point1, point2].map((p, i) =>
-                transformRotate(
-                  polygon([
-                    posList
-                      .map(([d, r]) => computeDestinationPoint(p, d * scale * 1.25, r))
-                      .map(({ longitude, latitude }) => [longitude, latitude]),
-                  ]),
-                  road.properties.bearing + (i % 2 ? 180 : 0)
+              ...[point1, point2].map((p, i) => {
+                const poly = posList
+                  .map(([d, r]) => computeDestinationPoint(p, d * scale * 1.25, r))
+                  .map(({ longitude, latitude }) => [longitude, latitude])
+                return transformRotate(
+                  polygon([[...poly, poly[0]]]),
+                  road.bearing + (i % 2 ? 180 : 0)
                 )
-              )
+              })
             )
           }
 
@@ -444,9 +459,9 @@ export const MapArea = () => {
         {mapGlLayers.map((layer) => (
           <Layer key={layer.id} {...layer} />
         ))}
-        {sourceLayers.map(({ source, layer }) => (
-          <Source key={source.id} {...source}>
-            <Layer {...layer} />
+        {sourceLayers.map(({ id, source, layer }) => (
+          <Source key={id} id={`${id}-source`} {...source}>
+            <Layer id={id} {...layer} />
           </Source>
         ))}
       </ReactMapGL>

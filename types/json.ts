@@ -1,17 +1,13 @@
 export type RoadFeature = {
   type: 'Feature'
-  properties: {
-    name: string
-    color: `rgb(${string})`
-    distance: number
-    distanceFrom: number
-    distanceTo: number
-    bearing: number
-    lonStart: number
-    latStart: number
-  }
-  geometry: {
-    type: 'LineString'
-    coordinates: [[number, number], [number, number]]
-  }
+  properties: { class: string }
+  geometry:
+    | {
+        type: 'MultiLineString'
+        coordinates: [number, number][][]
+      }
+    | {
+        type: 'LineString'
+        coordinates: [[number, number], [number, number]]
+      }
 }
