@@ -92,10 +92,10 @@ export const MapArea = () => {
         layer: {
           'source-layer': 'road',
           type: 'line',
-          filter: ['in', 'class', 'trunk', 'primary', 'secondary'],
+          filter: ['in', 'class', 'trunk', 'primary'],
           paint: {
-            'line-opacity': 0.6,
-            'line-color': 'rgb(53, 175, 109)',
+            // 'line-opacity': 0.6,
+            // 'line-color': 'rgb(53, 175, 109)',
             'line-width': 0,
           },
         },
@@ -299,38 +299,46 @@ export const MapArea = () => {
             road.bearing - 90 * (n % 2 ? 1 : -1)
           )
 
-          peopleList.push(
-            ...[point1, point2].map((p, i) => {
-              if (zoom < minzoom)
-                return {
-                  type: 'Feature' as const,
-                  properties: {},
-                  geometry: { type: 'Point' as const, coordinates: [p.longitude, p.latitude] },
-                }
-
-              const poly = posList
-                .map(([d, r]) => computeDestinationPoint(p, d * scale, r))
-                .map(({ longitude, latitude }) => [longitude, latitude] as [number, number])
-              return transformRotate(
-                polygon([[...poly, poly[0]]]),
-                road.bearing + (i % 2 ? 180 : 0)
-              )
-            })
-          )
-
-          if (zoom >= minzoom) {
-            shadowList.push(
+          try {
+            peopleList.push(
               ...[point1, point2].map((p, i) => {
-                const poly = posList
-                  .map(([d, r]) => computeDestinationPoint(p, d * scale * 1.5, r))
-                  .map(({ longitude, latitude }) => [longitude, latitude])
+                if (zoom < minzoom)
+                  return {
+                    type: 'Feature' as const,
+                    properties: {},
+                    geometry: { type: 'Point' as const, coordinates: [p.longitude, p.latitude] },
+                  }
 
+                const poly = posList
+                  .map(([d, r]) => computeDestinationPoint(p, d * scale, r))
+                  .map(({ longitude, latitude }) => [longitude, latitude] as [number, number])
                 return transformRotate(
                   polygon([[...poly, poly[0]]]),
                   road.bearing + (i % 2 ? 180 : 0)
                 )
               })
             )
+          } catch (e) {
+            if (e instanceof Error) console.log(e.message)
+          }
+
+          if (zoom >= minzoom) {
+            try {
+              shadowList.push(
+                ...[point1, point2].map((p, i) => {
+                  const poly = posList
+                    .map(([d, r]) => computeDestinationPoint(p, d * scale * 1.5, r))
+                    .map(({ longitude, latitude }) => [longitude, latitude])
+
+                  return transformRotate(
+                    polygon([[...poly, poly[0]]]),
+                    road.bearing + (i % 2 ? 180 : 0)
+                  )
+                })
+              )
+            } catch (e) {
+              if (e instanceof Error) console.log(e.message)
+            }
           }
           n += 1
         }
