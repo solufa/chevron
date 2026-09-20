@@ -18,7 +18,6 @@ jobs:
     name: Deploy to Cloudflare Workers
     runs-on: ubuntu-latest
     env:
-      NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
       WRANGLER_SEND_METRICS: 'false'
     steps:
       - uses: actions/checkout@v4

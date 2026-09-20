@@ -4,11 +4,15 @@ import { polygon } from '@turf/helpers'
 import { transformRotate } from '@turf/transform-rotate'
 import type { Feature, FeatureCollection, Geometry, GeoJsonProperties } from 'geojson'
 import { computeDestinationPoint, getDistance, getRhumbLineBearing } from 'geolib'
-import type { Map } from 'mapbox-gl'
-import 'mapbox-gl/dist/mapbox-gl.css'
+import { setWorkerUrl, type Map } from 'maplibre-gl'
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
+import 'maplibre-gl/dist/maplibre-gl.css'
 import { useEffect, useMemo, useState } from 'react'
-import ReactMapGL, { Layer, Source, type LayerProps, type SourceProps } from 'react-map-gl/mapbox'
+import ReactMapGL, { Layer, Source, type LayerProps, type SourceProps } from 'react-map-gl/maplibre'
 import type { RoadFeature } from '../types/json'
+
+// Bundle MapLibre's module worker and its imports as a deployable Vite asset.
+setWorkerUrl(workerUrl)
 
 const minzoom = 15
 
@@ -36,70 +40,9 @@ export const MapArea = () => {
     zoom: 11.548058916916952,
     pitch: 56.12617658004021,
   }
-  const mapGlLayers = useMemo<LayerProps[]>(
-    () => [
-      {
-        id: 'sky',
-        type: 'sky',
-        paint: {
-          'sky-type': 'atmosphere',
-          'sky-atmosphere-sun': [0.0, 0.0],
-          'sky-atmosphere-sun-intensity': 15,
-        },
-      },
-      {
-        id: 'add-3d-buildings',
-        source: 'composite',
-        'source-layer': 'building',
-        filter: ['==', 'extrude', 'true'],
-        type: 'fill-extrusion',
-        minzoom: minzoom,
-        paint: {
-          'fill-extrusion-color': '#aaa',
-          'fill-extrusion-height': [
-            'interpolate',
-            ['linear'],
-            ['zoom'],
-            minzoom,
-            0,
-            minzoom + 0.05,
-            ['get', 'height'],
-          ],
-          'fill-extrusion-base': [
-            'interpolate',
-            ['linear'],
-            ['zoom'],
-            minzoom,
-            0,
-            minzoom + 0.05,
-            ['get', 'min_height'],
-          ],
-        },
-      },
-    ],
-    [],
-  )
-
   const vectorRoadId = 'vector-road'
   const sourceLayers = useMemo<{ id: string; source: SourceProps; layer: LayerProps }[]>(
     () => [
-      {
-        id: vectorRoadId,
-        source: {
-          type: 'vector',
-          url: 'mapbox://mapbox.mapbox-streets-v8',
-        },
-        layer: {
-          'source-layer': 'road',
-          type: 'line',
-          filter: ['in', 'class', 'trunk', 'primary'],
-          paint: {
-            // 'line-opacity': 0.6,
-            // 'line-color': 'rgb(53, 175, 109)',
-            'line-width': 0,
-          },
-        },
-      },
       {
         id: 'cars-shadow',
         source: {
@@ -465,14 +408,19 @@ export const MapArea = () => {
     <ReactMapGL
       initialViewState={initialViewState}
       maxPitch={70}
-      mapStyle="mapbox://styles/mapbox/streets-v10"
+      mapStyle="https://tiles.openfreemap.org/styles/liberty"
       style={{ width: '100%', height: '100%', position: 'absolute' }}
-      mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
       onLoad={(event) => setMapObj(event.target)}
     >
-      {mapGlLayers.map((layer) => (
-        <Layer key={layer.id} {...layer} />
-      ))}
+      {/* Liberty includes 3D buildings. Reuse its vector source for the simulation roads. */}
+      <Layer
+        id={vectorRoadId}
+        source="openmaptiles"
+        source-layer="transportation"
+        type="line"
+        filter={['all', ['==', '$type', 'LineString'], ['in', 'class', 'trunk', 'primary']]}
+        paint={{ 'line-width': 1, 'line-opacity': 0 }}
+      />
       {sourceLayers.map(({ id, source, layer }) => (
         <Source key={id} id={`${id}-source`} {...source}>
           <Layer id={id} {...layer} />
