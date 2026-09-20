@@ -1,3 +1,5 @@
+'use client'
+
 import { polygon } from '@turf/helpers'
 import { transformRotate } from '@turf/transform-rotate'
 import type { Feature, FeatureCollection, Geometry, GeoJsonProperties } from 'geojson'

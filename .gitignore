@@ -38,3 +38,7 @@ tasks/road.json
 # vinext / Vite
 /dist/
 *.tsbuildinfo
+.vinext/
+.wrangler/
+.dev.vars
+.dev.vars.*
