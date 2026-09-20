@@ -1,13 +1,10 @@
 {
-  "eslint.run": "onSave",
   "editor.formatOnSave": true,
-  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.defaultFormatter": "oxc.oxc-vscode",
   "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": true,
-    "source.fixAll.stylelint": true
+    "source.fixAll.oxc": "explicit"
   },
   "typescript.tsdk": "node_modules/typescript/lib",
   "files.eol": "\n",
-  "editor.tabSize": 2,
-  "stylelint.validate": ["css", "less", "postcss", "typescriptreact"]
+  "editor.tabSize": 2
 }

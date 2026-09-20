@@ -1,17 +1,17 @@
-import DeckGL from '@deck.gl/react'
-import { Feature, polygon, Properties, transformRotate } from '@turf/turf'
-import { FeatureCollection, Geometry } from 'geojson'
+import { polygon } from '@turf/helpers'
+import { transformRotate } from '@turf/transform-rotate'
+import type { Feature, FeatureCollection, Geometry, GeoJsonProperties } from 'geojson'
 import { computeDestinationPoint, getDistance, getRhumbLineBearing } from 'geolib'
-import { Map } from 'mapbox-gl'
+import type { Map } from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import { useEffect, useMemo, useState } from 'react'
-import ReactMapGL, { Layer, LayerProps, Source, SourceProps, ViewportProps } from 'react-map-gl'
-import { RoadFeature } from '../types/json'
+import ReactMapGL, { Layer, Source, type LayerProps, type SourceProps } from 'react-map-gl/mapbox'
+import type { RoadFeature } from '../types/json'
 
 const minzoom = 15
 
 export const MapArea = () => {
-  const [mapObj, setMapObj] = useState<Map>()
+  const [mapObj, setMapObj] = useState<Map | undefined>(undefined)
   const [peopleJson, setPeopleJson] = useState<FeatureCollection<Geometry>>({
     type: 'FeatureCollection',
     features: [],
@@ -28,13 +28,12 @@ export const MapArea = () => {
     type: 'FeatureCollection',
     features: [],
   })
-  const [viewport, setViewport] = useState<ViewportProps>({
+  const initialViewState = {
     latitude: 35.610493335927146,
     longitude: 139.70963079522326,
     zoom: 11.548058916916952,
     pitch: 56.12617658004021,
-    maxPitch: 70,
-  })
+  }
   const mapGlLayers = useMemo<LayerProps[]>(
     () => [
       {
@@ -76,7 +75,7 @@ export const MapArea = () => {
         },
       },
     ],
-    []
+    [],
   )
 
   const vectorRoadId = 'vector-road'
@@ -194,7 +193,7 @@ export const MapArea = () => {
         },
       },
     ],
-    [peopleJson]
+    [peopleJson, peopleShadowJson, carsJson, carsShadowJson],
   )
 
   useEffect(() => {
@@ -205,9 +204,13 @@ export const MapArea = () => {
     let cancelId = 0
     const fn = () => {
       if (!mapObj) return
+      if (!mapObj.isStyleLoaded() || !mapObj.getLayer(vectorRoadId)) {
+        cancelId = requestAnimationFrame(fn)
+        return
+      }
 
       const now = Date.now()
-      const features = mapObj.queryRenderedFeatures(undefined, {
+      const features = mapObj.queryRenderedFeatures({
         layers: [vectorRoadId],
       }) as unknown as RoadFeature[]
       const roadList = features
@@ -219,9 +222,9 @@ export const MapArea = () => {
                   distance: getDistance(c[i], pos),
                   bearing: getRhumbLineBearing(
                     { lon: c[i][0], lat: c[i][1] },
-                    { lon: pos[0], lat: pos[1] }
+                    { lon: pos[0], lat: pos[1] },
                   ),
-                }))
+                })),
               )
             : f.geometry.coordinates.slice(1).map((pos, i) => {
                 if (f.geometry.type !== 'LineString') throw new Error('')
@@ -231,12 +234,13 @@ export const MapArea = () => {
                   distance: getDistance(f.geometry.coordinates[i], pos),
                   bearing: getRhumbLineBearing(
                     { lon: f.geometry.coordinates[i][0], lat: f.geometry.coordinates[i][1] },
-                    { lon: pos[0], lat: pos[1] }
+                    { lon: pos[0], lat: pos[1] },
                   ),
                 }
-              })
+              }),
         )
         .flat(2)
+        .filter((line) => line.distance > 0)
         .reduce(
           ({ distanceFrom, lines }, line) => ({
             distanceFrom: distanceFrom + line.distance,
@@ -258,7 +262,7 @@ export const MapArea = () => {
               distanceFrom: number
               distanceTo: number
             }[],
-          }
+          },
         ).lines
       const totalDistance = roadList.reduce((dis, d) => dis + d.distance, 0)
       const step = Math.max(1, Math.floor(totalDistance / 250))
@@ -267,8 +271,8 @@ export const MapArea = () => {
       const scale = zoom >= minzoom ? 2 : 4
       const list1 = roadList.map((road) => {
         const remain = road.distanceFrom % step
-        const peopleList: Feature<Geometry, Properties>[] = []
-        const shadowList: Feature<Geometry, Properties>[] = []
+        const peopleList: Feature<Geometry, GeoJsonProperties>[] = []
+        const shadowList: Feature<Geometry, GeoJsonProperties>[] = []
         const posList = [
           [0.25, 0],
           [0.25, 90],
@@ -283,19 +287,19 @@ export const MapArea = () => {
             computeDestinationPoint(
               road.startPos, // road.geometry.coordinates[0] を使うとずれる
               (step * n - remain + velocityPerMS.walker * now) % road.distance,
-              road.bearing
+              road.bearing,
             ),
             (Math.sin(n + 1) + 3.2) * scale,
-            road.bearing + 90 * (n % 2 ? 1 : -1)
+            road.bearing + 90 * (n % 2 ? 1 : -1),
           )
           const point2 = computeDestinationPoint(
             computeDestinationPoint(
               road.startPos,
               (step * n - remain + velocityPerMS.walker * (10000000000000 - now)) % road.distance,
-              road.bearing
+              road.bearing,
             ),
             (Math.sin(n) + 3.3) * scale,
-            road.bearing - 90 * (n % 2 ? 1 : -1)
+            road.bearing - 90 * (n % 2 ? 1 : -1),
           )
 
           try {
@@ -313,9 +317,9 @@ export const MapArea = () => {
                   .map(({ longitude, latitude }) => [longitude, latitude] as [number, number])
                 return transformRotate(
                   polygon([[...poly, poly[0]]]),
-                  road.bearing + (i % 2 ? 180 : 0)
+                  road.bearing + (i % 2 ? 180 : 0),
                 )
-              })
+              }),
             )
           } catch (e) {
             if (e instanceof Error) console.log(e.message)
@@ -358,8 +362,8 @@ export const MapArea = () => {
       const carsStep = step * 20
       const list2 = roadList.map((road) => {
         const remain = road.distanceFrom % carsStep
-        const carsList: Feature<Geometry, Properties>[] = []
-        const shadowList: Feature<Geometry, Properties>[] = []
+        const carsList: Feature<Geometry, GeoJsonProperties>[] = []
+        const shadowList: Feature<Geometry, GeoJsonProperties>[] = []
         const posList = [
           [0.5, 0],
           [0.5, 90],
@@ -374,20 +378,20 @@ export const MapArea = () => {
             computeDestinationPoint(
               road.startPos,
               (carsStep * n - remain + velocityPerMS.car * now) % road.distance,
-              road.bearing
+              road.bearing,
             ),
             0.75 * scale,
-            road.bearing - 90
+            road.bearing - 90,
           )
 
           const point2 = computeDestinationPoint(
             computeDestinationPoint(
               road.startPos,
               (carsStep * n - remain + velocityPerMS.car * (10000000000000 - now)) % road.distance,
-              road.bearing
+              road.bearing,
             ),
             0.75 * scale,
-            road.bearing + 90
+            road.bearing + 90,
           )
 
           try {
@@ -405,9 +409,9 @@ export const MapArea = () => {
                   .map(({ longitude, latitude }) => [longitude, latitude])
                 return transformRotate(
                   polygon([[...poly, poly[0]]]),
-                  road.bearing + (i % 2 ? 180 : 0)
+                  road.bearing + (i % 2 ? 180 : 0),
                 )
-              })
+              }),
             )
           } catch (e) {
             if (e instanceof Error) console.log(e.message)
@@ -456,30 +460,22 @@ export const MapArea = () => {
   }, [mapObj])
 
   return (
-    <DeckGL
-      initialViewState={viewport}
-      controller
-      width="100%"
-      height="100%"
-      onViewStateChange={(args) => setViewport(args.viewState)}
+    <ReactMapGL
+      initialViewState={initialViewState}
+      maxPitch={70}
+      mapStyle="mapbox://styles/mapbox/streets-v10"
+      style={{ width: '100%', height: '100%', position: 'absolute' }}
+      mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
+      onLoad={(event) => setMapObj(event.target)}
     >
-      <ReactMapGL
-        {...viewport}
-        mapStyle="mapbox://styles/mapbox/streets-v10"
-        width="100%"
-        height="100%"
-        mapboxApiAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
-        onLoad={(e) => setMapObj(e.target)}
-      >
-        {mapGlLayers.map((layer) => (
-          <Layer key={layer.id} {...layer} />
-        ))}
-        {sourceLayers.map(({ id, source, layer }) => (
-          <Source key={id} id={`${id}-source`} {...source}>
-            <Layer id={id} {...layer} />
-          </Source>
-        ))}
-      </ReactMapGL>
-    </DeckGL>
+      {mapGlLayers.map((layer) => (
+        <Layer key={layer.id} {...layer} />
+      ))}
+      {sourceLayers.map(({ id, source, layer }) => (
+        <Source key={id} id={`${id}-source`} {...source}>
+          <Layer id={id} {...layer} />
+        </Source>
+      ))}
+    </ReactMapGL>
   )
 }

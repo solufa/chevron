@@ -1,35 +1,12 @@
-import styled from 'styled-components'
-import { Logo } from '../components/Logo'
+import { Logo } from './Logo'
 
-const Texts = styled.main`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 0 16px;
-`
-
-const Title = styled.div`
-  font-size: 4rem;
-  line-height: 1.15;
-  transform: scale(1.5);
-`
-
-const Description = styled.p`
-  font-size: 2.5rem;
-  font-weight: bold;
-  line-height: 1.5;
-  text-align: center;
-`
-
-export const TextsArea = () => {
-  return (
-    <Texts>
-      <Title>
-        <Logo />
-      </Title>
-
-      <Description>人流データプラットフォーム</Description>
-    </Texts>
-  )
-}
+export const TextsArea = () => (
+  <main className="flex flex-col items-center justify-center pt-10 pb-4">
+    <div className="scale-150 text-[4rem] leading-[1.15]">
+      <Logo />
+    </div>
+    <p className="my-[1em] text-center text-[2.5rem] leading-[1.5] font-bold">
+      人流データプラットフォーム
+    </p>
+  </main>
+)

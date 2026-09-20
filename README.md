@@ -1,34 +1,47 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# CHEVRON
 
-## Getting Started
+人流データプラットフォーム。Mapboxの道路上に人・車の移動を描画します。
 
-First, run the development server:
+## 開発
+
+Node.js 24以上とnpmを使用します（`.nvmrc` は24）。
 
 ```bash
+npm ci
+cp .env.local.sample .env.local
+# .env.local の NEXT_PUBLIC_MAPBOX_TOKEN をMapboxの公開トークンに変更
 npm run dev
-# or
-yarn dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+http://localhost:3000 を開きます。地図の表示には有効なMapbox公開トークンが必要です。
+`NEXT_PUBLIC_MAPBOX_TOKEN` はビルド時にブラウザ向けコードへ埋め込まれます。
 
-You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
+## コマンド
 
-[API routes](https://nextjs.org/docs/api-routes/introduction) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
+```bash
+npm run lint       # OxlintとOxfmtによるチェック
+npm run lint:fix   # lintの自動修正と整形
+npm run format    # Oxfmtによる整形
+npm run typecheck # TypeScriptの型チェック
+npm run build     # vinextの本番ビルド・静的書き出し
+npm start         # 本番ビルドをローカルで確認
+```
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/api-routes/introduction) instead of React pages.
+## 構成
 
-## Learn More
+- [vinext](https://github.com/cloudflare/vinext) + Vite + React 19。Pages Routerを使用。
+- [Tailwind CSS](https://tailwindcss.com/docs/installation/using-vite) 4。
+- [Oxlint / Oxfmt](https://oxc.rs/) によるlint・フォーマット。
+- react-map-gl 8 + Mapbox GL JS 3。
 
-To learn more about Next.js, take a look at the following resources:
+Next.jsパッケージは不要です。`next/head` と `next/app` の互換API・型はvinextが提供します。
+`next.config.js` はvinextが読み込む設定で、`output: 'export'` により静的ファイルを生成します。
+vinextはベータ版のため、検証したバージョンを固定しています。
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 公開
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+`npm run build` の静的出力先は `dist/client/` です。
+`public/CNAME`、画像、faviconもこのディレクトリにコピーされます。
+GitHub Actionsはnpmでlint・型チェック・ビルドを実行し、mainへのpush時に
+`dist/client/` を既存のGitHub Pages用ブランチへ公開します。
+リポジトリのSecret `NEXT_PUBLIC_MAPBOX_TOKEN` を設定してください。

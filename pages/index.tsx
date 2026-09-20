@@ -1,37 +1,22 @@
-import type { NextPage } from 'next'
 import Head from 'next/head'
-import styled from 'styled-components'
 import { MapArea } from '../components/MapArea'
 import { TextsArea } from '../components/TextsArea'
 
-const Container = styled.div`
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  background: center/cover url('images/background.png');
-`
-
-const MainContainer = styled.div`
-  position: relative;
-  flex: 1;
-`
-
-const Home: NextPage = () => {
+export default function Home() {
   return (
-    <Container onContextMenu={(e) => e.preventDefault()}>
+    <div
+      className="flex h-screen flex-col bg-[url('/images/background.png')] bg-cover bg-center"
+      onContextMenu={(event) => event.preventDefault()}
+    >
       <Head>
         <title>{'<< CHEVRON >> | People Flow OpenData Platform'}</title>
         <meta name="description" content="<< CHEVRON >> | People Flow OpenData Platform" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-
       <TextsArea />
-
-      <MainContainer>
+      <div className="relative flex-1">
         <MapArea />
-      </MainContainer>
-    </Container>
+      </div>
+    </div>
   )
 }
-
-export default Home

@@ -34,3 +34,7 @@ yarn-error.log*
 .vercel
 
 tasks/road.json
+
+# vinext / Vite
+/dist/
+*.tsbuildinfo
