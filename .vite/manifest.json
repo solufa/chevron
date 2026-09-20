@@ -1,0 +1,80 @@
+{
+  "_framework-CcMTCLoD.js": {
+    "file": "_next/static/chunks/framework-CcMTCLoD.js",
+    "name": "framework",
+    "imports": [
+      "_rolldown-runtime-8BhlS34s.js"
+    ]
+  },
+  "_rolldown-runtime-8BhlS34s.js": {
+    "file": "_next/static/chunks/rolldown-runtime-8BhlS34s.js",
+    "name": "rolldown-runtime"
+  },
+  "_vinext-DgLSNysD.js": {
+    "file": "_next/static/chunks/vinext-DgLSNysD.js",
+    "name": "vinext",
+    "imports": [
+      "_rolldown-runtime-8BhlS34s.js",
+      "_framework-CcMTCLoD.js"
+    ],
+    "dynamicImports": [
+      "_vinext-DgLSNysD.js",
+      "_framework-CcMTCLoD.js"
+    ]
+  },
+  "node_modules/mapbox-gl/dist/mapbox-gl.js": {
+    "file": "_next/static/chunks/mapbox-gl-B8VPheGo.js",
+    "name": "mapbox-gl",
+    "src": "node_modules/mapbox-gl/dist/mapbox-gl.js",
+    "isDynamicEntry": true,
+    "imports": [
+      "_rolldown-runtime-8BhlS34s.js",
+      "_vinext-DgLSNysD.js"
+    ]
+  },
+  "pages/_app.tsx": {
+    "file": "_next/static/chunks/_app-DFaCP3fN.js",
+    "name": "_app",
+    "src": "pages/_app.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_framework-CcMTCLoD.js"
+    ],
+    "css": [
+      "_next/static/css/_app.oQCB-hKo.css"
+    ]
+  },
+  "pages/index.tsx": {
+    "file": "_next/static/chunks/pages-Bm4_lfyi.js",
+    "name": "pages",
+    "src": "pages/index.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_rolldown-runtime-8BhlS34s.js",
+      "_framework-CcMTCLoD.js",
+      "_vinext-DgLSNysD.js"
+    ],
+    "dynamicImports": [
+      "node_modules/mapbox-gl/dist/mapbox-gl.js"
+    ],
+    "css": [
+      "_next/static/css/pages.DsZBW-Fw.css"
+    ]
+  },
+  "virtual:vinext-client-entry": {
+    "file": "_next/static/chunks/index-B828PtR_.js",
+    "name": "index",
+    "src": "virtual:vinext-client-entry",
+    "isEntry": true,
+    "imports": [
+      "_rolldown-runtime-8BhlS34s.js",
+      "_framework-CcMTCLoD.js",
+      "_vinext-DgLSNysD.js"
+    ],
+    "dynamicImports": [
+      "pages/index.tsx",
+      "_vinext-DgLSNysD.js",
+      "pages/_app.tsx"
+    ]
+  }
+}

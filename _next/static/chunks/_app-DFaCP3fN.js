@@ -1,0 +1,1 @@
+import{t as e}from"./framework-CcMTCLoD.js";var t=e();function n({Component:e,pageProps:n}){return(0,t.jsx)(e,{...n})}export{n as default};
